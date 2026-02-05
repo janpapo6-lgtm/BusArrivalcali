@@ -1,0 +1,7 @@
+{
+  "name": "BusArrival: Smart Stop Alarms",
+  "description": "A travel companion app that monitors your GPS location and alerts you 5 minutes before arriving at your destination, ensuring you never miss your stop.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
