@@ -192,17 +192,13 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ userLocation, destination, star
   const fetchRoute = async (start: Location, end: Location) => {
     if (!mapRef.current) return;
     try {
-      // Usamos el servicio OSRM gratuito (router.project-osrm.org).
-      // NOTA: Este servicio es público y a menudo está sobrecargado, por lo que a veces devuelve errores 503 o HTML en lugar de JSON.
       const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson&alternatives=true`;
       
       const res = await fetch(url);
-      
-      // Verificamos si la respuesta es válida y es JSON antes de intentar parsearla
       const contentType = res.headers.get("content-type");
       if (!res.ok || !contentType || !contentType.includes("application/json")) {
-        console.warn("Routing service unavailable or returned non-JSON response.");
-        return; // Salimos silenciosamente para no romper la app
+        console.warn("Routing service unavailable.");
+        return;
       }
 
       const data = await res.json();
@@ -232,7 +228,6 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ userLocation, destination, star
         }).addTo(mapRef.current);
       }
     } catch (err) {
-      // Ignoramos errores de red o parseo en la ruta para que la app siga funcionando (solo sin línea de ruta)
       console.warn("Routing error handled safely:", err);
     }
   };
@@ -319,7 +314,7 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ userLocation, destination, star
       mainRouteCasingRef.current = null;
       if (altRoutesRef.current) altRoutesRef.current.clearLayers();
     }
-  }, [userLocation, destination, startingLocation, radius, markers]);
+  }, [userLocation, destination, startingLocation, radius, markers, t]);
 
   return (
     <div className="w-full h-[450px] md:h-[600px] shadow-2xl overflow-hidden border border-gray-200 rounded-[3rem] relative bg-gray-100 transition-all duration-500 ease-in-out">
@@ -331,11 +326,8 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ userLocation, destination, star
         </div>
       )}
 
-      {/* BARRA DE CONTROLES INFERIOR IZQUIERDA - UNIFICADOS */}
       <div className="absolute bottom-6 left-6 z-[400] flex flex-col gap-3 pointer-events-none">
-        
         <div className="flex flex-col items-start gap-3 pointer-events-auto">
-          {/* Submenú de Capas */}
           <div className={`flex flex-col gap-2 transition-all duration-300 ${isLayersOpen ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}`}>
             <button onClick={() => { setMapType('standard'); setIsLayersOpen(false); }} className="w-[52px] h-[52px] bg-white rounded-2xl shadow-xl border border-slate-100 flex items-center justify-center active:scale-95 transition-all">
               <MapIcon size={20} className={mapType === 'standard' ? 'text-blue-600' : 'text-slate-400'} />
@@ -381,7 +373,6 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ userLocation, destination, star
             )}
           </div>
         </div>
-
       </div>
 
       <div className="absolute top-6 left-6 z-[400] bg-blue-600/90 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-blue-400/50 text-[10px] font-black text-white shadow-xl pointer-events-none uppercase tracking-widest">

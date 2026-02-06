@@ -56,6 +56,112 @@ export const triggerHaptic = (pattern: number | number[] = 15) => {
 };
 
 let sharedAudioCtx: AudioContext | null = null;
+let wakeLock: any = null;
+let keepAliveInterval: number | null = null;
+
+/**
+ * BACKGROUND HACK 1: Wake Lock
+ * Requests the screen to stay on. Handles NotAllowedError silently.
+ */
+export const requestWakeLock = async () => {
+  if (typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
+    try {
+      wakeLock = await (navigator as any).wakeLock.request('screen');
+      console.log('Wake Lock active');
+    } catch (err: any) {
+      // Silently ignore permission policy errors
+      if (err.name !== 'NotAllowedError' && err.name !== 'SecurityError') {
+        console.warn('WakeLock failed:', err.message);
+      }
+    }
+  }
+};
+
+export const releaseWakeLock = () => {
+  if (wakeLock !== null) {
+    wakeLock.release().then(() => {
+      wakeLock = null;
+    }).catch(() => {
+      wakeLock = null;
+    });
+  }
+};
+
+/**
+ * BACKGROUND HACK 2: Silent Audio & Notifications
+ * Initializes audio context and permissions.
+ */
+export const initBackgroundService = async () => {
+  // 1. Request Notification Permission
+  if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted') {
+    try {
+      await Notification.requestPermission();
+    } catch (e) {}
+  }
+
+  // 2. Start Silent Audio Loop (Keep Alive)
+  if (!sharedAudioCtx) {
+    sharedAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+  
+  if (sharedAudioCtx.state === 'suspended') {
+    try {
+      await sharedAudioCtx.resume();
+    } catch (e) {}
+  }
+
+  // Play a silent sound every 20 seconds to keep the tab "active" in background
+  if (keepAliveInterval) clearInterval(keepAliveInterval);
+  
+  const playSilentPing = () => {
+    if (!sharedAudioCtx) return;
+    try {
+      const osc = sharedAudioCtx.createOscillator();
+      const gain = sharedAudioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(sharedAudioCtx.destination);
+      osc.frequency.value = 100; // Low freq
+      gain.gain.value = 0.001; // Almost silent but technically playing
+      osc.start();
+      osc.stop(sharedAudioCtx.currentTime + 0.1);
+    } catch (e) {}
+  };
+
+  playSilentPing(); // Immediate
+  keepAliveInterval = window.setInterval(playSilentPing, 20000);
+  
+  // 3. Request Wake Lock
+  await requestWakeLock();
+};
+
+export const stopBackgroundService = () => {
+  if (keepAliveInterval) {
+    clearInterval(keepAliveInterval);
+    keepAliveInterval = null;
+  }
+  releaseWakeLock();
+};
+
+export const sendSystemNotification = (title: string, body: string) => {
+  if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.showNotification(title, {
+            body,
+            icon: '/icon-192.png',
+            vibrate: [200, 100, 200],
+            tag: 'arrival-alarm'
+          } as any);
+        });
+      } else {
+        new Notification(title, { body, icon: '/icon-192.png' });
+      }
+    } catch (e) {
+      console.error("Notification failed", e);
+    }
+  }
+};
 
 /**
  * Plays synthesized alarm sounds using Web Audio API.

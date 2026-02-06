@@ -1,12 +1,14 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   X, Bell, Map as MapIcon, Languages, Volume2, Smartphone, Save,
-  Navigation, User, Bus, Car, Bike, MapPin, Flag, Home, Star, Store, Coffee, Circle, Play
+  Navigation, User, Bus, Car, Bike, MapPin, Flag, Home, Star, Store, Coffee, Circle, Play,
+  Sparkles, Layout
 } from 'lucide-react';
 import { AlarmSettings, Language } from '../types';
 import { translations } from '../translations';
 import { triggerHaptic, playAlarmSound } from '../utils';
+import MarketingKit from './MarketingKit';
 
 interface SettingsModalProps {
   settings: AlarmSettings;
@@ -35,6 +37,7 @@ const ICONS = Object.keys(ICON_MAP).filter(key => key !== 'circle');
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, onClose }) => {
   const [localSettings, setLocalSettings] = React.useState<AlarmSettings>({ ...settings });
+  const [showMarketing, setShowMarketing] = useState(false);
   const t = translations[localSettings.language];
 
   const handleSave = () => {
@@ -88,30 +91,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, onClose
         </div>
 
         <div className="p-8 overflow-y-auto space-y-8 no-scrollbar">
-          {/* Idioma */}
-          <section className="space-y-4">
-            <div className="flex items-center gap-3 text-blue-600">
-              <Languages size={20} />
-              <h3 className="font-black text-xs uppercase tracking-[0.2em]">{t.language}</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {(['es', 'en'] as Language[]).map((lang) => (
-                <button
-                  key={lang}
-                  onClick={() => setLocalSettings({ ...localSettings, language: lang })}
-                  className={`py-4 rounded-2xl font-black text-sm transition-all border-2 ${
-                    localSettings.language === lang 
-                    ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-lg shadow-blue-100' 
-                    : 'border-gray-100 text-gray-400 hover:border-gray-200'
-                  }`}
-                >
-                  {lang === 'es' ? 'Español' : 'English'}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          {/* Tipo de Alarma */}
+          {/* Tipo de Alarma y Proximidad */}
           <section className="space-y-4">
             <div className="flex items-center gap-3 text-blue-600">
               <Bell size={20} />
@@ -161,6 +141,72 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, onClose
             </div>
           </section>
 
+          {/* Marcadores */}
+          <section className="space-y-8">
+            <div className="flex items-center gap-3 text-blue-600">
+              <MapIcon size={20} />
+              <h3 className="font-black text-xs uppercase tracking-[0.2em]">{t.mapCustomization}</h3>
+            </div>
+            
+            {/* Marcador Usuario */}
+            <div className="space-y-6 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+              <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
+                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                  <User size={16} />
+                </div>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.userMarker}</p>
+              </div>
+              
+              <div className="space-y-4">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.markerColor}</p>
+                <div className="flex flex-wrap gap-2">
+                  {COLORS.map(c => (
+                    <button 
+                      key={c} 
+                      onClick={() => setLocalSettings({...localSettings, markers: {...localSettings.markers, userColor: c}})}
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${localSettings.markers.userColor === c ? 'border-blue-600 scale-125 shadow-lg' : 'border-transparent'}`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.markerIcon}</p>
+                {renderIconPicker(localSettings.markers.userIcon, (icon) => setLocalSettings({...localSettings, markers: {...localSettings.markers, userIcon: icon}}), localSettings.markers.userColor)}
+              </div>
+            </div>
+
+            {/* Marcador Destino */}
+            <div className="space-y-6 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+              <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
+                <div className="p-2 bg-red-100 text-red-600 rounded-lg">
+                  <MapPin size={16} />
+                </div>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.destMarker}</p>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.markerColor}</p>
+                <div className="flex flex-wrap gap-2">
+                  {COLORS.map(c => (
+                    <button 
+                      key={c} 
+                      onClick={() => setLocalSettings({...localSettings, markers: {...localSettings.markers, destColor: c}})}
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${localSettings.markers.destColor === c ? 'border-blue-600 scale-125 shadow-lg' : 'border-transparent'}`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.markerIcon}</p>
+                {renderIconPicker(localSettings.markers.destIcon, (icon) => setLocalSettings({...localSettings, markers: {...localSettings.markers, destIcon: icon}}), localSettings.markers.destColor)}
+              </div>
+            </div>
+          </section>
+
           {/* Sonido y Vibración */}
           <section className="space-y-4">
              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
@@ -207,71 +253,36 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, onClose
              </div>
           </section>
 
-          {/* Marcadores */}
-          <section className="space-y-8 pb-4">
+          {/* Idioma */}
+          <section className="space-y-4">
             <div className="flex items-center gap-3 text-blue-600">
-              <MapIcon size={20} />
-              <h3 className="font-black text-xs uppercase tracking-[0.2em]">{t.mapCustomization}</h3>
+              <Languages size={20} />
+              <h3 className="font-black text-xs uppercase tracking-[0.2em]">{t.language}</h3>
             </div>
-            
-            {/* User Marker Config */}
-            <div className="space-y-6 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-              <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
-                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                  <User size={16} />
-                </div>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.userMarker}</p>
-              </div>
-              
-              <div className="space-y-4">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.markerColor}</p>
-                <div className="flex flex-wrap gap-2">
-                  {COLORS.map(c => (
-                    <button 
-                      key={c} 
-                      onClick={() => setLocalSettings({...localSettings, markers: {...localSettings.markers, userColor: c}})}
-                      className={`w-8 h-8 rounded-full border-2 transition-all ${localSettings.markers.userColor === c ? 'border-blue-600 scale-125 shadow-lg' : 'border-transparent'}`}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.markerIcon}</p>
-                {renderIconPicker(localSettings.markers.userIcon, (icon) => setLocalSettings({...localSettings, markers: {...localSettings.markers, userIcon: icon}}), localSettings.markers.userColor)}
-              </div>
-            </div>
-
-            {/* Destination Marker Config */}
-            <div className="space-y-6 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-              <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
-                <div className="p-2 bg-red-100 text-red-600 rounded-lg">
-                  <MapPin size={16} />
-                </div>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.destMarker}</p>
-              </div>
-
-              <div className="space-y-4">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.markerColor}</p>
-                <div className="flex flex-wrap gap-2">
-                  {COLORS.map(c => (
-                    <button 
-                      key={c} 
-                      onClick={() => setLocalSettings({...localSettings, markers: {...localSettings.markers, destColor: c}})}
-                      className={`w-8 h-8 rounded-full border-2 transition-all ${localSettings.markers.destColor === c ? 'border-blue-600 scale-125 shadow-lg' : 'border-transparent'}`}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.markerIcon}</p>
-                {renderIconPicker(localSettings.markers.destIcon, (icon) => setLocalSettings({...localSettings, markers: {...localSettings.markers, destIcon: icon}}), localSettings.markers.destColor)}
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              {(['es', 'en'] as Language[]).map((lang) => (
+                <button
+                  key={lang}
+                  onClick={() => setLocalSettings({ ...localSettings, language: lang })}
+                  className={`py-4 rounded-2xl font-black text-sm transition-all border-2 ${
+                    localSettings.language === lang 
+                    ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-lg shadow-blue-100' 
+                    : 'border-gray-100 text-gray-400 hover:border-gray-200'
+                  }`}
+                >
+                  {lang === 'es' ? 'Español' : 'English'}
+                </button>
+              ))}
             </div>
           </section>
+
+          {/* Marketing Kit (Moved to bottom) */}
+          <button 
+            onClick={() => setShowMarketing(true)}
+            className="w-full p-4 border-2 border-dashed border-blue-100 rounded-2xl text-blue-400 flex items-center justify-center gap-2 hover:bg-blue-50 hover:text-blue-600 transition-all text-[10px] font-black uppercase tracking-widest"
+          >
+            <Sparkles size={14} /> Generador de Marketing AI
+          </button>
         </div>
 
         <div className="p-8 bg-gray-50 border-t border-gray-100">
@@ -283,6 +294,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, onClose
           </button>
         </div>
       </div>
+
+      {showMarketing && (
+        <MarketingKit lang={localSettings.language} onClose={() => setShowMarketing(false)} />
+      )}
     </div>
   );
 };

@@ -11,7 +11,7 @@ import {
   Search, MapPin, Bell, CheckCircle, RefreshCw, 
   Flag, Map as MapIcon, LocateFixed, Link as LinkIcon,
   Star, Clock as HistoryIcon, Trash2, AlertCircle, XCircle,
-  X, ChevronRight, Building, House, Navigation
+  X, ChevronRight, Building, House, Navigation, Settings
 } from 'lucide-react';
 import { playAlarmSound, triggerHaptic } from './utils';
 
@@ -24,6 +24,7 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [aiDetails, setAiDetails] = useState<{ stopName: string; context: string; landmarks?: string[] } | null>(null);
@@ -59,12 +60,10 @@ const App: React.FC = () => {
           playAlarmSound(settings.alarmSound);
         }
         if (settings.enableVibration) {
-          // Patrón de vibración de alarma: 500ms vibración, 200ms pausa, 500ms vibración
           triggerHaptic([500, 200, 500]);
         }
       };
 
-      // Ejecución inmediata y luego repetitiva cada 1.5 segundos
       triggerAlert();
       interval = window.setInterval(triggerAlert, 1500);
     }
@@ -74,7 +73,6 @@ const App: React.FC = () => {
     };
   }, [mode, settings.enableSound, settings.enableVibration, settings.alarmSound]);
 
-  // Búsqueda instantánea en local (Favoritos e Historial)
   const localResults = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (q.length < 2) return [];
@@ -90,7 +88,6 @@ const App: React.FC = () => {
     return [...favMatches, ...histMatches];
   }, [searchQuery, favorites, history]);
 
-  // Cargar persistencia
   useEffect(() => {
     const savedHistory = localStorage.getItem('busarrival_history');
     const savedFavorites = localStorage.getItem('busarrival_favorites');
@@ -98,7 +95,6 @@ const App: React.FC = () => {
     if (savedFavorites) setFavorites(JSON.parse(savedFavorites));
   }, []);
 
-  // Guardar persistencia
   useEffect(() => {
     localStorage.setItem('busarrival_history', JSON.stringify(history));
   }, [history]);
@@ -107,7 +103,6 @@ const App: React.FC = () => {
     localStorage.setItem('busarrival_favorites', JSON.stringify(favorites));
   }, [favorites]);
 
-  // Seguimiento GPS
   useEffect(() => {
     if (!navigator.geolocation) return;
     const watchId = navigator.geolocation.watchPosition(
@@ -124,7 +119,6 @@ const App: React.FC = () => {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [isStartLinked, mode, t.startingPoint]);
 
-  // Búsqueda remota (Nominatim)
   useEffect(() => {
     const controller = new AbortController();
     const signal = controller.signal;
@@ -134,29 +128,44 @@ const App: React.FC = () => {
       if (queryToUse.length < 3) {
         setSuggestions([]);
         setIsSearching(false);
+        setSearchError(null);
         return;
       }
 
       setIsSearching(true);
+      setSearchError(null);
+      
       try {
-        let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryToUse)}&limit=6&addressdetails=1&accept-language=${settings.language}`;
+        let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryToUse)}&limit=5&addressdetails=1&dedupe=1&accept-language=${settings.language}`;
         const res = await fetch(url, { signal });
+        
+        if (!res.ok) throw new Error(`Status: ${res.status}`);
+        
         const data = await res.json();
         if (!signal.aborted) {
-          setSuggestions(data);
-          setIsSearching(false);
+          setSuggestions(Array.isArray(data) ? data : []);
         }
       } catch (e: any) {
-        if (e.name !== 'AbortError') setIsSearching(false);
+        if (e.name !== 'AbortError') {
+          console.warn("Search warning:", e.message);
+          if (!signal.aborted) {
+             setSearchError(t.offlineError || "Error");
+             setSuggestions([]);
+          }
+        }
+      } finally {
+        if (!signal.aborted) {
+          setIsSearching(false);
+        }
       }
     };
 
-    const timer = setTimeout(fetchSuggestions, 300);
+    const timer = setTimeout(fetchSuggestions, 600);
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [searchQuery, settings.language]);
+  }, [searchQuery, settings.language, t.offlineError]);
 
   const loadAIData = async (query: string, name: string) => {
     setLoading(true);
@@ -176,13 +185,17 @@ const App: React.FC = () => {
     if (mode === AppMode.TRACKING) return;
     const fallbackName = t.tapMap;
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=${settings.language}`);
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=${settings.language}`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!res.ok) throw new Error("Reverse geocoding failed");
       const data = await res.json();
       const name = data.display_name?.split(',')[0] || fallbackName;
       setDestination({ lat, lng, name });
       setMode(AppMode.SEARCHING);
       loadAIData(data.display_name || name, name);
     } catch (err) {
+      console.warn("Map click reverse geocode failed", err);
       setDestination({ lat, lng, name: fallbackName });
       setMode(AppMode.SEARCHING);
     }
@@ -258,6 +271,8 @@ const App: React.FC = () => {
     triggerHaptic(50);
   };
 
+  const showDropdown = searchQuery.length >= 2 && (isSearching || localResults.length > 0 || suggestions.length > 0 || searchError || (searchQuery.length >= 3 && suggestions.length === 0));
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans relative selection:bg-blue-100">
       <Header onOpenSettings={() => setShowSettings(true)} lang={settings.language} />
@@ -280,7 +295,16 @@ const App: React.FC = () => {
         {mode === AppMode.IDLE && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="text-center">
-              <h2 className="text-3xl font-black text-gray-900 mb-1">{t.whereTo}</h2>
+              <div className="flex items-center justify-center gap-3 mb-1">
+                <h2 className="text-3xl font-black text-gray-900">{t.whereTo}</h2>
+                <button
+                  onClick={() => { triggerHaptic(20); setShowSettings(true); }}
+                  className="p-2 bg-white text-gray-400 border border-gray-100 rounded-2xl hover:text-blue-600 hover:border-blue-100 hover:shadow-md transition-all active:scale-90"
+                  aria-label="Settings"
+                >
+                  <Settings size={20} />
+                </button>
+              </div>
               <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">{t.searchSub}</p>
             </div>
 
@@ -298,7 +322,7 @@ const App: React.FC = () => {
                </div>
 
                {/* Campo de Búsqueda */}
-               <div className="relative">
+               <div className="relative z-[5000]">
                   <div className="flex items-center gap-4 px-4 py-3 bg-white border-2 border-blue-100 rounded-2xl focus-within:border-blue-500 transition-all shadow-sm">
                     {isSearching ? <RefreshCw size={18} className="text-blue-500 animate-spin" /> : <Search size={18} className="text-blue-500" />}
                     <input
@@ -311,8 +335,23 @@ const App: React.FC = () => {
                   </div>
                   
                   {/* Resultados sugeridos */}
-                  {(localResults.length > 0 || suggestions.length > 0) && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-3xl shadow-2xl z-[100] overflow-hidden border border-gray-100 divide-y divide-gray-50">
+                  {showDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-3xl shadow-2xl z-[5000] overflow-hidden border border-gray-100 divide-y divide-gray-50 max-h-[50vh] overflow-y-auto">
+                      {isSearching && suggestions.length === 0 && (
+                        <div className="p-4 text-center text-gray-400 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+                           <RefreshCw size={12} className="animate-spin" /> {t.searching || "Buscando..."}
+                        </div>
+                      )}
+                      {searchError && (
+                        <div className="p-4 text-center text-red-400 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+                           <AlertCircle size={12} /> {searchError}
+                        </div>
+                      )}
+                      {!isSearching && suggestions.length === 0 && localResults.length === 0 && !searchError && (
+                        <div className="p-4 text-center text-gray-400 text-xs font-bold uppercase tracking-widest">
+                           {t.noResults || "Sin resultados"}
+                        </div>
+                      )}
                       {[...localResults, ...suggestions].map((item, idx) => (
                         <button key={idx} onClick={() => selectSuggestion(item)} className="w-full px-6 py-4 text-left hover:bg-blue-50 flex items-center gap-4 transition-colors group">
                           <div className={`p-2 rounded-xl shrink-0 ${item.isLocal ? 'bg-amber-50 text-amber-500' : 'bg-blue-50 text-blue-500'}`}>

@@ -75,7 +75,11 @@ export const translations = {
     mapTerrain: "Terreno",
     mapTraffic: "Tráfico",
     didYouMean: "¿Quisiste decir:",
-    aiCorrecting: "Corrigiendo búsqueda..."
+    aiCorrecting: "Corrigiendo búsqueda...",
+    backgroundHint: "Tip: Mantén la pestaña abierta. Hemos activado un modo de bajo consumo para que el GPS no se detenga si apagas la pantalla.",
+    noResults: "Sin resultados",
+    searching: "Buscando...",
+    offlineError: "Error de conexión"
   },
   en: {
     appTitle: "BusArrival",
@@ -152,7 +156,11 @@ export const translations = {
     mapTerrain: "Terrain",
     mapTraffic: "Traffic",
     didYouMean: "Did you mean:",
-    aiCorrecting: "Correcting search..."
+    aiCorrecting: "Correcting search...",
+    backgroundHint: "Tip: Keep the tab open. We activated a low-power mode so GPS continues even if you turn off the screen.",
+    noResults: "No results found",
+    searching: "Searching...",
+    offlineError: "Connection error"
   }
 };
 

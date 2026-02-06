@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { Location, AlarmSettings } from '../types';
-import { calculateDistance, formatDistance, calculateETA, formatTime, triggerHaptic } from '../utils';
-import { Navigation, Clock, Target, Moon, Coffee } from 'lucide-react';
+import { calculateDistance, formatDistance, calculateETA, formatTime, initBackgroundService, stopBackgroundService, sendSystemNotification } from '../utils';
+import { Navigation, Clock, Target, Moon, Coffee, ShieldCheck } from 'lucide-react';
 import { translations } from '../translations';
 
 interface Props {
@@ -17,8 +17,26 @@ const LocationTracker: React.FC<Props> = ({ destination, settings, onArrived }) 
   const [error, setError] = useState<string | null>(null);
   const [snoozeUntil, setSnoozeUntil] = useState<number>(0);
   const [secondsLeft, setSecondsLeft] = useState<number>(0);
+  const [bgActive, setBgActive] = useState(false);
   
   const t = translations[settings.language];
+
+  // Activar servicios de fondo al montar el componente
+  useEffect(() => {
+    const startBg = async () => {
+      try {
+        await initBackgroundService();
+        setBgActive(true);
+      } catch (e) {
+        console.warn("Background service failed", e);
+      }
+    };
+    startBg();
+
+    return () => {
+      stopBackgroundService();
+    };
+  }, []);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -45,8 +63,13 @@ const LocationTracker: React.FC<Props> = ({ destination, settings, onArrived }) 
           shouldTrigger = currentEta <= settings.threshold;
         }
 
-        // ACTIVACIÓN AUTOMÁTICA: Si se cumple la condición, disparamos la alarma inmediatamente
+        // ACTIVACIÓN AUTOMÁTICA
         if (shouldTrigger) {
+          // Enviar notificación del sistema por si la app está minimizada
+          sendSystemNotification(
+            t.preAlarmTitle, 
+            `${t.arrivedSub} ${destination.name}`
+          );
           onArrived();
         }
       },
@@ -57,7 +80,7 @@ const LocationTracker: React.FC<Props> = ({ destination, settings, onArrived }) 
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
-  }, [destination, settings, snoozeUntil, onArrived, t.geoError]);
+  }, [destination, settings, snoozeUntil, onArrived, t.geoError, t.preAlarmTitle, t.arrivedSub]);
 
   useEffect(() => {
     let interval: number;
@@ -132,7 +155,10 @@ const LocationTracker: React.FC<Props> = ({ destination, settings, onArrived }) 
               </div>
             )}
           </div>
-          <p className="text-[10px] text-gray-300 font-bold uppercase tracking-tighter">{t.gpsUpdated}</p>
+          <div className="flex items-center gap-1.5">
+            {bgActive && <ShieldCheck size={12} className="text-emerald-500" />}
+            <p className="text-[10px] text-gray-300 font-bold uppercase tracking-tighter">{t.gpsUpdated}</p>
+          </div>
         </div>
 
         {error && (
@@ -140,6 +166,13 @@ const LocationTracker: React.FC<Props> = ({ destination, settings, onArrived }) 
             {error}
           </div>
         )}
+      </div>
+      
+      {/* Background Hint */}
+      <div className="px-4 text-center">
+        <p className="text-[9px] text-gray-400 font-medium">
+          {t.backgroundHint}
+        </p>
       </div>
     </div>
   );
